@@ -9,6 +9,7 @@ using Grpc.Core;
 namespace Anno.Rpc.Center
 {
     using Anno;
+    using Anno.Log;
     /// <summary>
     /// 系统配置
     /// </summary>
@@ -23,6 +24,10 @@ namespace Anno.Rpc.Center
         /// 服务更改通知事件
         /// </summary>
         public event ServiceChangeNotice ChangeNotice = null;
+        /// <summary>
+        /// AnnoCenter 默认配置文件名称
+        /// </summary>
+        public static string AnnoFile { get; set; } = "Anno.config";
         private static readonly object LockHelper = new object();
 
         private static readonly object LockAdd = new object();
@@ -82,7 +87,7 @@ namespace Anno.Rpc.Center
         /// </summary>
         private void Init()
         {
-            string xmlPath = Path.Combine(Directory.GetCurrentDirectory(), "Anno.config");
+            string xmlPath = Path.Combine(Directory.GetCurrentDirectory(), AnnoFile);
             if (File.Exists(xmlPath))
             {
                 XmlDocument xml = new XmlDocument();
@@ -184,17 +189,14 @@ namespace Anno.Rpc.Center
                         ServiceInfoList.Add(ips);
                     }
 
-                    Console.ForegroundColor = ConsoleColor.DarkGreen;
-                    Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                    Console.WriteLine($"{ips.Ip}:{ips.Port}");
+                    Log.WriteLine($"{ips.Ip}:{ips.Port}", ConsoleColor.DarkGreen);
                     ips.Name.Split(',').ToList().ForEach(f =>
                     {
-                        Console.WriteLine($"{f}");
+                        Log.WriteLine($"{f}", ConsoleColor.DarkGreen);
                     });
-                    Console.WriteLine($"{"w:" + ips.Weight}");
-                    Console.WriteLine($"{ips.NickName}已登记！");
-                    Console.ResetColor();
-                    Console.WriteLine($"----------------------------------------------------------------- ");
+                    Log.WriteLine($"{"权重:" + ips.Weight}", ConsoleColor.DarkGreen);
+                    Log.WriteLine($"{ips.NickName}已登记！", ConsoleColor.DarkGreen);
+                    Log.WriteLineNoDate($"-----------------------------------------------------------------------------");
                     #region 上线和变更通知
                     if (OnlineNotice != null && oldService == null)
                     {
@@ -227,7 +229,7 @@ namespace Anno.Rpc.Center
             try
             {
                 XmlDocument xml = new XmlDocument();
-                xml.Load(Path.Combine(Directory.GetCurrentDirectory(), "Anno.config"));
+                xml.Load(Path.Combine(Directory.GetCurrentDirectory(), AnnoFile));
                 XmlNode servers = xml.SelectSingleNode("//configuration/Servers");//查找<Servers> 
                 servers.RemoveAll();
                 List<ServiceInfo> tempIps = new List<ServiceInfo>();
@@ -249,7 +251,7 @@ namespace Anno.Rpc.Center
                     xe.SetAttribute("weight", p.Weight.ToString());
                     servers.AppendChild(xe);
                 });
-                xml.Save(Path.Combine(Directory.GetCurrentDirectory(), "Anno.config"));
+                xml.Save(Path.Combine(Directory.GetCurrentDirectory(), AnnoFile));
             }
             catch (Exception ex)
             {

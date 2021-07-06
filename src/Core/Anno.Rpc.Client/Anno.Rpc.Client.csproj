@@ -20,8 +20,8 @@
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Anno.Const\Anno.Const.csproj" />
     <ProjectReference Include="..\..\Anno.CronNET\Anno.CronNET.csproj" />
+    <ProjectReference Include="..\..\Anno.Log\Anno.Log.csproj" />
   </ItemGroup>
 
 
@@ -32,8 +32,5 @@
   <ItemGroup Condition="'$(TargetFramework)' == 'net461'">
     <!--<PackageReference Include="System.ValueTuple" Version="4.5.0" />-->
     <!--<PackageReference Include="ApacheThrift" Version="0.12.0.1" />-->
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="..\..\..\logo.jpg" Link="logo.jpg" PackagePath="\" />
   </ItemGroup>
 </Project>

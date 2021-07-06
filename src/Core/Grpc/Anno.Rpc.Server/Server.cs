@@ -4,6 +4,7 @@ using Grpc.Core;
 
 namespace Anno.Rpc.Server
 {
+    using Anno.Log;
     public static class Server
     {
         private static Grpc.Core.Server _server;
@@ -30,7 +31,7 @@ namespace Anno.Rpc.Server
             var logo = "\r\n";
             logo += " -----------------------------------------------------------------------------\r\n";
             logo +=
-@"                                                _                    
+$@"                                                _                    
      /\                           ___          (_)                   
     /  \    _ __   _ __    ___   ( _ )  __   __ _  _ __    ___  _ __ 
    / /\ \  | '_ \ | '_ \  / _ \  / _ \/\\ \ / /| || '_ \  / _ \| '__|
@@ -38,7 +39,7 @@ namespace Anno.Rpc.Server
  /_/    \_\|_| |_||_| |_| \___/  \___/\/  \_/  |_|| .__/  \___||_|   
                                                   | |                
                                                   |_|                
-                                            anno&viper  grpc service
+                                   [{EngineData.SysInfo.RunTimeWatch.StartTime:yyyy-MM-dd HH:mm:ss}] grpc service
 ";
             logo += " -----------------------------------------------------------------------------\r\n";
             logo += $" Server Port      {Const.SettingService.Local.Port} \r\n";
@@ -46,7 +47,7 @@ namespace Anno.Rpc.Server
             logo += $" Version          [{ typeof(Client.Connector).Assembly.GetName().Version}]\r\n";
             logo += $" Repository       https://github.com/duyanming/anno.core \r\n";
             logo += " -----------------------------------------------------------------------------\r\n";
-            System.Console.WriteLine(logo);
+            Log.WriteLineNoDate(logo);
         }
     }
 }

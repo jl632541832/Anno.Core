@@ -15,7 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\logo.jpg" Link="logo.jpg" PackagePath="\" />
     <ProjectReference Include="..\Anno.Const\Anno.Const.csproj" />
   </ItemGroup>
 

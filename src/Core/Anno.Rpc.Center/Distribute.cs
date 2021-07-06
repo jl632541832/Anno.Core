@@ -4,13 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Thrift.Transport;
-using Thrift.Protocol;
-using System.IO;
-using System.Threading.Tasks;
-using Anno.Rpc;
 
 namespace Anno.Rpc.Center
 {
+    using Anno.Log;
     public static class Distribute
     {
         /// <summary>
@@ -27,23 +24,20 @@ namespace Anno.Rpc.Center
         public static List<Micro> GetMicro(string channel)
         {
             List<ServiceInfo> service = new List<ServiceInfo>();
+            //if (channel.StartsWith("md5:"))
+            //{
+            //    long waitTime = 19000;
+            //    var md5 = channel.Substring(4);
+            //    while(md5.Equals(Tc.ServiceMd5) && waitTime > 0)
+            //    {
+            //        waitTime = waitTime - 10;
+            //        Task.Delay(10).Wait();// Thread.Sleep(10);
+            //    }
+            //    service = Tc.ServiceInfoList;
+            //}
+
             if (channel.StartsWith("md5:"))
             {
-                //if (JudgeIsDebug.IsDebug)
-                //{
-                //    Log.Log.ConsoleWriteLine($"channel:{channel},long connection.");
-                //}
-                long waitTime = 19000;
-                var md5 = channel.Substring(4);
-                while (md5.Equals(Tc.ServiceMd5) && waitTime > 0)
-                {
-                    waitTime = waitTime - 10;
-                    Thread.Sleep(10);
-                }
-                //if (JudgeIsDebug.IsDebug)
-                //{
-                //    Log.Log.ConsoleWriteLine($"channel:{channel},long connection end.");
-                //}
                 service = Tc.ServiceInfoList;
             }
             else
@@ -79,7 +73,7 @@ namespace Anno.Rpc.Center
             int hc = 60;//检查次数
 
         hCheck://再次  心跳检测
-            TTransport transport = new TSocket(service.Ip, service.Port, 3000);
+            TTransport transport = new TSocket(service.Ip, service.Port, 10_000);
             try
             {
                 service.Checking = true;
@@ -88,17 +82,14 @@ namespace Anno.Rpc.Center
                 {
                     if (hc != 60)
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkGreen;
-                        Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}: ");
-                        Console.WriteLine($"{service.Ip}:{service.Port}");
+                        Log.WriteLine($"{service.Ip}:{service.Port}", ConsoleColor.DarkGreen);
                         foreach (var f in service.Name.Split(','))
                         {
-                            Console.WriteLine($"{f}");
+                            Log.WriteLine($"{f}", ConsoleColor.DarkGreen);
                         }
-                        Console.WriteLine($"{"w:" + service.Weight}");
-                        Console.WriteLine($"恢复正常！");
-                        Console.ResetColor();
-                        Console.WriteLine($"----------------------------------------------------------------- ");
+                        Log.WriteLine($"{"权重:" + service.Weight}", ConsoleColor.DarkGreen);
+                        Log.WriteLine($"恢复正常！", ConsoleColor.DarkGreen);
+                        Log.WriteLineNoDate($"-----------------------------------------------------------------------------");
                     }                   
                     transport.Flush();
                     transport.Close();
@@ -123,48 +114,39 @@ namespace Anno.Rpc.Center
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error Info:{service.Ip}:{service.Port} {ex.Message}");
+                Log.WriteLine($"Error Info:{service.Ip}:{service.Port} {ex.Message}", ConsoleColor.DarkYellow);
                 if (hc == 60)
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}: ");
-                    Console.WriteLine($"{service.Ip}:{service.Port}");
+                    Log.WriteLine($"{service.Ip}:{service.Port}", ConsoleColor.DarkYellow);
                     foreach (var f in service.Name.Split(','))
                     {
-                        Console.WriteLine($"{f}");
+                        Log.WriteLine($"{f}", ConsoleColor.DarkYellow);
                     }
-                    Console.WriteLine($"{"w:" + service.Weight}");
-                    Console.WriteLine($"检测中···{hc}！");
-                    Console.ResetColor();
-                    Console.WriteLine($"----------------------------------------------------------------- ");
+                    Log.WriteLine($"{"权重:" + service.Weight}", ConsoleColor.DarkYellow);
+                    Log.WriteLine($"检测中···{hc}！", ConsoleColor.DarkYellow);
+                    Log.WriteLineNoDate($"-----------------------------------------------------------------------------");
                 }
                 else if (hc == (60 - errorCount))
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}: ");
-                    Console.WriteLine($"{service.Ip}:{service.Port}");
+                    Log.WriteLine($"{service.Ip}:{service.Port}", ConsoleColor.DarkYellow);
                     foreach (var f in service.Name.Split(','))
                     {
-                        Console.WriteLine($"{f}");
+                        Log.WriteLine($"{f}", ConsoleColor.DarkYellow);
                     }
-                    Console.WriteLine($"{"w:" + service.Weight}");
-                    Console.WriteLine($"故障恢复中···{hc}！");
-                    Console.ResetColor();
-                    Console.WriteLine($"----------------------------------------------------------------- ");
+                    Log.WriteLine($"{"权重:" + service.Weight}", ConsoleColor.DarkYellow);
+                    Log.WriteLine($"故障恢复中···{hc}！", ConsoleColor.DarkYellow);
+                    Log.WriteLineNoDate($"-----------------------------------------------------------------------------");
                 }
                 else if (hc == 0) //硬删除
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkRed;
-                    Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}:");
-                    Console.WriteLine($"{service.Ip}:{service.Port}");
+                    Log.WriteLine($"{service.Ip}:{service.Port}", ConsoleColor.DarkYellow);
                     foreach (var f in service.Name.Split(','))
                     {
                         Console.WriteLine($"{f}");
                     }
-                    Console.WriteLine($"{"w:" + service.Weight}");
-                    Console.WriteLine($"永久移除！");
-                    Console.ResetColor();
-                    Console.WriteLine($"----------------------------------------------------------------- ");                   
+                    Log.WriteLine($"{"权重:" + service.Weight}", ConsoleColor.DarkYellow);
+                    Log.WriteLine($"永久移除···{hc}！", ConsoleColor.DarkYellow);
+                    Log.WriteLineNoDate($"-----------------------------------------------------------------------------");                 
                 }
 
                 if (hc == (60 - errorCount)) //三次失败之后 临时移除 ，防止更多请求转发给此服务节点 

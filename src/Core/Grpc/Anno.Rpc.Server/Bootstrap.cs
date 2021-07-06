@@ -4,6 +4,7 @@ using System.Threading;
 
 namespace Anno.Rpc.Server
 {
+    using Anno.Log;
     using System.Collections.Generic;
     using Anno.Rpc.Storage;
     using System.Reflection;
@@ -19,24 +20,25 @@ namespace Anno.Rpc.Server
         /// <param name="iocType">依赖注入类型</param>
         public static void StartUp(string[] args, Action diAction, Action startUpCallBack = null, Loader.IocType iocType = Loader.IocType.Autofac)
         {
-            Loader.IocLoader.RegisterIoc(iocType);
             var reStar = false;
         reStart:
             try
             {
-                Enter(args, diAction, reStar);
-                startUpCallBack?.Invoke();
+                Enter(args, diAction, reStar, iocType);
+                try
+                {
+                    startUpCallBack?.Invoke();
+                }
+                catch (Exception ex) {
+                    Log.WriteLineAlignNoDate(ex.Message);
+                }
                 AppDomain.CurrentDomain.ProcessExit += (s, e) =>
                 {
                     if (Server.State)
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkGreen;
-                        Console.WriteLine(
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {Const.SettingService.AppName} Service is being stopped·····");
+                        Log.WriteLine($"{Const.SettingService.AppName} Service is being stopped·····", ConsoleColor.DarkGreen);
                         Server.Stop();
-                        Console.WriteLine(
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {Const.SettingService.AppName} The service has stopped!");
-                        Console.ResetColor();
+                        Log.WriteLine($"{Const.SettingService.AppName} The service has stopped!", ConsoleColor.DarkGreen);
                     }
                 };
                 //阻止daemon进程退出
@@ -47,7 +49,7 @@ namespace Anno.Rpc.Server
             }
             catch (Exception e)
             {
-                Log.Log.Error(e);
+                Log.Error(e);
                 if (e is Grpc.Core.RpcException)
                 {
                     reStar = true;
@@ -66,13 +68,12 @@ namespace Anno.Rpc.Server
         /// <param name="args"></param>
         /// <param name="diAction"></param>
         /// <param name="reStart">异常之中回复启动，true。正常启动，false</param>
-        static void Enter(string[] args, Action diAction, bool reStart)
+        static void Enter(string[] args, Action diAction, bool reStart, Loader.IocType iocType)
         {
             if (!reStart)
             {
-                EngineData.AnnoBootstrap.Bootstrap(diAction);
+                EngineData.AnnoBootstrap.Bootstrap(diAction, iocType);
             }
-            Console.Title = Const.SettingService.AppName;
             #region 设置监听端口（可以通过参数 设置。没有取配置文件）
 
             int.TryParse(ArgsValue.GetValueByName("-p", args), out int port);
@@ -101,9 +102,7 @@ namespace Anno.Rpc.Server
                 }
                 else
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine("-h 参数错误!");
-                    Console.ResetColor();
+                    Log.WriteLine("-h 参数错误!", ConsoleColor.DarkYellow);
                 }
             }
             var traceOnOffStr = ArgsValue.GetValueByName("-tr", args);
@@ -113,18 +112,17 @@ namespace Anno.Rpc.Server
                 Const.SettingService.TraceOnOff = traceOnOff;
             }
             #endregion
-
-            Server.Start();
-            Console.ForegroundColor = ConsoleColor.DarkGreen;
-            Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            Console.WriteLine($"节点【{Const.SettingService.AppName}】(端口：{Const.SettingService.Local.Port})已启动");
+            if (!Server.State)
+            {
+                Server.Start();
+            }
+            Log.WriteLine($"节点【{Const.SettingService.AppName}】(端口：{Const.SettingService.Local.Port})已启动", ConsoleColor.DarkGreen);
             foreach (var f in Anno.Const.SettingService.FuncName.Split(','))
             {
-                Console.WriteLine($"{f}");
+                Log.WriteLine($"{f}", ConsoleColor.DarkGreen);
             }
-            Console.WriteLine($"{"权重:" + Anno.Const.SettingService.Weight}");
-            Console.ResetColor();
-            Console.WriteLine($"----------------------------------------------------------------- ");
+            Log.WriteLine($"{"权重:" + Const.SettingService.Weight}", ConsoleColor.DarkGreen);
+            Log.WriteLineNoDate("-----------------------------------------------------------------------------");
             Const.SettingService.Ts.ForEach(t => { new Client.Register().ToCenter(t, 60); });
             /*
              * 1、 Const.SettingService.Local 在AnnoService(服务提供方)中 作为 本机信息
@@ -180,7 +178,7 @@ namespace Anno.Rpc.Server
             var del = Newtonsoft.Json.JsonConvert.DeserializeObject<AnnoDataResult>(StorageEngine.Invoke(input));
             if (del.Status == false)
             {
-                Log.Log.Error(del);
+                Log.Error(del);
             }
             input.Clear();
             input[StorageCommand.COMMAND] = StorageCommand.APIDOCCOMMAND;
@@ -189,7 +187,7 @@ namespace Anno.Rpc.Server
             var rlt = Newtonsoft.Json.JsonConvert.DeserializeObject<AnnoDataResult>(StorageEngine.Invoke(input));
             if (rlt.Status == false)
             {
-                Log.Log.Error(rlt);
+                Log.Error(rlt);
             }
         }
     }

@@ -16,6 +16,7 @@ namespace Anno.EngineData
     /// </summary>
     public static class Engine
     {
+        private readonly static Type enumType = typeof(Enum);
         /// <summary>
         /// 转发器
         /// </summary>
@@ -23,7 +24,7 @@ namespace Anno.EngineData
         /// <returns></returns>
         public static ActionResult Transmit(Dictionary<string, string> input)
         {
-            #region 查找System.Type
+            #region 查找路由信息RoutInfo
             var key = $"{input[Eng.NAMESPACE]}Service.{input[Eng.CLASS]}Module/{input[Eng.METHOD]}";
             if (Routing.Routing.Router.TryGetValue(key, out Routing.RoutInfo routInfo))
             {
@@ -61,7 +62,7 @@ namespace Anno.EngineData
         /// <returns></returns>
         public static async Task<ActionResult> TransmitAsync(Dictionary<string, string> input)
         {
-            return await Task.Run(() => Transmit(input));
+            return await Task.Run(() => Transmit(input)).ConfigureAwait(false);
         }
         /// <summary>
         /// 根据服务转发
@@ -86,7 +87,7 @@ namespace Anno.EngineData
                 }
                 #endregion
                 List<object> lo = new List<object>() { input };
-                module = Loader.IocLoader.Resolve<BaseModule>(routInfo.RoutModuleType); //创建实例(无参构造器)
+                module = Loader.IocLoader.Resolve<BaseModule>(routInfo.RoutModuleType);
                 var init = module.Init(input);
                 if (!init)
                 {
@@ -111,12 +112,13 @@ namespace Anno.EngineData
                     routInfo.AuthorizationFilters[i].OnAuthorization(module);
                     if (!module.Authorized)
                     {
-                        return new ActionResult()
+                        return module.ActionResult == null ? new ActionResult()
                         {
                             Status = false,
                             OutputData = 401,
                             Msg = "401,Unauthrized"
-                        };
+                        } : module.ActionResult
+                        ;
                     }
                 }
                 #endregion
@@ -124,8 +126,19 @@ namespace Anno.EngineData
                 {
                     routInfo.ActionFilters[i].OnActionExecuting(module);
                 }
-                var rltCustomize = routInfo.RoutMethod.Invoke(module, DicToParameters(routInfo.RoutMethod, input).ToArray());
-                if (rltCustomize != null && typeof(IActionResult).IsAssignableFrom(rltCustomize.GetType()))
+                #region 调用业务方法
+                object rltCustomize = null;
+                if (routInfo.ReturnTypeIsTask)
+                {
+                    var rlt = (routInfo.RoutMethod.Invoke(module, DicToParameters(routInfo.RoutMethod, input).ToArray()) as Task);
+                    rltCustomize = routInfo.RoutMethod.ReturnType.GetProperty("Result").GetValue(rlt, null);
+                }
+                else
+                {
+                    rltCustomize = routInfo.RoutMethod.Invoke(module, DicToParameters(routInfo.RoutMethod, input).ToArray());
+                }
+
+                if (routInfo.ReturnTypeIsIActionResult && rltCustomize != null)
                 {
                     module.ActionResult = rltCustomize as ActionResult;
                 }
@@ -133,6 +146,7 @@ namespace Anno.EngineData
                 {
                     module.ActionResult = new ActionResult(true, rltCustomize);
                 }
+                #endregion
                 for (int i = (routInfo.ActionFilters.Count - 1); i >= 0; i--)
                 {
                     routInfo.ActionFilters[i].OnActionExecuted(module);
@@ -152,8 +166,10 @@ namespace Anno.EngineData
                         ef.OnException(ex, module);
                     }
                 }
+#if DEBUG
                 //记录日志
                 Log.Log.Error(ex, routInfo.RoutModuleType);
+#endif
                 return new ActionResult()
                 {
                     Status = false,
@@ -171,7 +187,7 @@ namespace Anno.EngineData
         /// <returns></returns>
         public static async Task<ActionResult> TransmitAsync(Dictionary<string, string> input, Routing.RoutInfo routInfo)
         {
-            return await Task.Run(() => Transmit(input, routInfo));
+            return await Task.Run(() => Transmit(input, routInfo)).ConfigureAwait(false);
         }
         /// <summary>
         /// 扩展属性校验
@@ -186,12 +202,12 @@ namespace Anno.EngineData
             {
                 if (p.GetCustomAttributes<FromBodyAttribute>().Any())
                 {
-                    parameters.Add(Newtonsoft.Json.JsonConvert.DeserializeObject(Newtonsoft.Json.JsonConvert.SerializeObject(input), p.ParameterType));
+                    parameters.Add(p.ParameterType.ToObjFromDic(input));
                     continue;
                 }
                 else if (input.ContainsKey(p.Name))
                 {
-                    if (p.ParameterType.FullName.StartsWith("System.Collections.Generic.List`1["))
+                    if (p.ParameterType.FullName.StartsWith("System.Collections.Generic"))
                     {
                         parameters.Add(Newtonsoft.Json.JsonConvert.DeserializeObject(input[p.Name], p.ParameterType));
                     }
@@ -199,7 +215,7 @@ namespace Anno.EngineData
                     {
                         parameters.Add(Convert.ChangeType(input[p.Name], p.ParameterType));//枚举
                     }
-                    else if (p.ParameterType.BaseType == typeof(Enum))
+                    else if (p.ParameterType.BaseType == enumType)
                     {
 
                         parameters.Add(Enum.Parse(p.ParameterType, input[p.Name]));
@@ -295,6 +311,49 @@ namespace Anno.EngineData
             }
 
             return sb.ToString();
+        }
+
+        private static object ToObjFromDic(this Type type, Dictionary<string, string> input)
+        {
+            var body = type.Assembly.CreateInstance(type.FullName);
+            List<PropertyInfo> targetProps = type.GetProperties().Where(p => p.CanWrite == true).ToList();
+            var fields = type.GetFields().Where(p => p.IsPublic).ToList();
+            if (targetProps != null && targetProps.Count > 0)
+            {
+                var keys = input.Keys.ToList();
+                foreach (var propertyInfo in targetProps)
+                {
+                    foreach (var key in keys)
+                    {
+                        if (key.Equals(propertyInfo.Name, StringComparison.CurrentCultureIgnoreCase))
+                        {
+                            var valueStr = input[key];
+                            try
+                            {
+                                if (propertyInfo.PropertyType.IsPrimitive ||
+                                    (propertyInfo.PropertyType.FullName.StartsWith("System.") && !propertyInfo.PropertyType.FullName.StartsWith("System.Collections.Generic")))
+                                {
+                                    var value = Convert.ChangeType(valueStr, propertyInfo.PropertyType);
+                                    propertyInfo.SetValue(body, value, null);
+                                }
+                                else if (propertyInfo.PropertyType.BaseType == enumType)
+                                {
+                                    var value = Enum.Parse(propertyInfo.PropertyType, valueStr);
+                                    propertyInfo.SetValue(body, value, null);
+                                }
+                                else
+                                {
+                                    var value = Newtonsoft.Json.JsonConvert.DeserializeObject(valueStr, propertyInfo.PropertyType);
+                                    propertyInfo.SetValue(body, value, null);
+                                }
+                            }
+                            catch { }
+                            break;
+                        }
+                    }
+                }
+            }
+            return body;
         }
     }
 }

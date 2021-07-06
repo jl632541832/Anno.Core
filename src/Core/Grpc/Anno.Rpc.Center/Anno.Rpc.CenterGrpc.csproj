@@ -19,7 +19,4 @@
       <Compile Include="..\..\Anno.Rpc.Center\Adapter\*.cs" />
     <Compile Include="..\..\Anno.Rpc.Center\EventNotice.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="..\..\..\..\logo.jpg" Link="logo.jpg" PackagePath="\" />
-  </ItemGroup>
 </Project>

@@ -1,11 +1,10 @@
-﻿
-using Thrift.Transport;
+﻿using Thrift.Transport;
 using Thrift.Server;
 using System.Threading;
-using System.Reflection;
 
 namespace Anno.Rpc.Server
 {
+    using Anno.Log;
     public static class Server
     {
         private static  TServer _server;
@@ -13,14 +12,14 @@ namespace Anno.Rpc.Server
         public static void Start()
         {
             OutputLogo();
-            TServerSocket serverTransport = new TServerSocket(Anno.Const.SettingService.Local.Port, 0, true);
+            TServerSocket serverTransport = new TServerSocket(Const.SettingService.Local.Port, 0, true);
             BrokerService.Processor processor = new BrokerService.Processor(new BusinessImpl());
             int maxThreads = Const.SettingService.MaxThreads;
             if (maxThreads <= 0)
             {
-                maxThreads = 200;
+                maxThreads = 500;
             }
-            _server = new TThreadedServer(processor, serverTransport,Log.Log.ConsoleWriteLine, maxThreads);
+            _server = new TThreadedServer(processor, serverTransport,Log.ConsoleWriteLine, maxThreads);
             new Thread(_server.Serve) { IsBackground = true }.Start();//开启业务服务
             State = true;
         }
@@ -36,7 +35,7 @@ namespace Anno.Rpc.Server
             var logo = "\r\n";
             logo += " -----------------------------------------------------------------------------\r\n";
             logo +=
-@"                                                _                    
+$@"                                                _                    
      /\                           ___          (_)                   
     /  \    _ __   _ __    ___   ( _ )  __   __ _  _ __    ___  _ __ 
    / /\ \  | '_ \ | '_ \  / _ \  / _ \/\\ \ / /| || '_ \  / _ \| '__|
@@ -44,7 +43,7 @@ namespace Anno.Rpc.Server
  /_/    \_\|_| |_||_| |_| \___/  \___/\/  \_/  |_|| .__/  \___||_|   
                                                   | |                
                                                   |_|                
-                                            anno&viper  thrift service 
+                                 [{EngineData.SysInfo.RunTimeWatch.StartTime:yyyy-MM-dd HH:mm:ss}] thrift service 
 ";
             logo += " -----------------------------------------------------------------------------\r\n";
             logo += $" Server Port      {Const.SettingService.Local.Port} \r\n";
@@ -52,7 +51,7 @@ namespace Anno.Rpc.Server
             logo += $" Version          [{ typeof(Client.Connector).Assembly.GetName().Version}]\r\n";
             logo += $" Repository       https://github.com/duyanming/anno.core \r\n";
             logo += " -----------------------------------------------------------------------------\r\n";
-            System.Console.WriteLine(logo);
+            Log.WriteLineNoDate(logo);
         }
     }
 }
